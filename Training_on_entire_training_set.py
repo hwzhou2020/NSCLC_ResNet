@@ -1,5 +1,5 @@
 """
-For each train-test experiment, train a model based on predetermined parameters and test on the reserved slides
+For each train-test experiment, train a model based on predetermined parameters
 
 @author: Haowen Zhou and Siyu (Steven) Lin, Oct 17, 2023
 """
@@ -117,10 +117,10 @@ if __name__ == '__main__':
     Cpath = ''
     
     # Hyper Parameters and Paths
-    root_name = 'NSCLC_Dataset' 
-    model_abbr = 'Resenet18_' # Model Identifier
-    magnif = '20'             # 20x Magnification Images
-    num_epochs_list = [16,8,23] # Number of epochs to train for each train-test experiment, determined from cross-validation
+    root_name = 'NSCLC_Dataset'  # Dataset directory name
+    model_abbr = 'Resenet18_'    # Model Identifier
+    magnif = '20'                # 20x Magnification Images
+    num_epochs_list = [16,8,23]  # Number of epochs to train for each train-test experiment, determined from cross-validation
 
 
     tile_per_slide = 1000
@@ -174,7 +174,6 @@ if __name__ == '__main__':
     slides_C  = np.array(slides_C)
     
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    
     print(device)
     
     # Train Test Splits
@@ -226,19 +225,13 @@ if __name__ == '__main__':
                                     transforms.RandomRotation(90),
                                     transforms.ToTensor(),
                                     transforms.Normalize([mean_r,mean_g,mean_b], [std_r,std_g,std_b])
-                                    ]),
-            'val': transforms.Compose([
-                                    transforms.Resize(256),
-                                    transforms.CenterCrop(224),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize([mean_r,mean_g,mean_b], [std_r,std_g,std_b])
-                                    ]),
+                                    ])
             }
         
         # Customized Dataset and corresponding Dataloader for current train-test experiment
-        image_datasets = {x: NSCLC_Dataset(data_dir + '/train/', x, data_transforms[x], validation_slide_splits[fold]) for x in ['train', 'val']}
-        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=num_workers) for x in ['train', 'val'] }
-        dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
+        image_datasets = {x: NSCLC_Dataset(data_dir + '/train/', x, data_transforms[x], validation_slide_splits[fold]) for x in ['train']}
+        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=num_workers) for x in ['train'] }
+        dataset_sizes = {x: len(image_datasets[x]) for x in ['train']}
         print(dataset_sizes)
            
         

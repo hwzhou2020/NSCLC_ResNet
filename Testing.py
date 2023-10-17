@@ -1,15 +1,9 @@
-# -*- coding: utf-8 -*-
 """
-Created on Sat Jan 28 20:23:02 2023
+For each train-test experiment, train a model based on predetermined parameters
 
-@author: 49750
-
+@author: Haowen Zhou and Siyu (Steven) Lin, Oct 17, 2023
 """
-# In[1]
-# Include / import python libraries
-
-# Author: Siyu (Steven) Lin
-
+# In[0] Dependencies and Library Configurations
 from __future__ import print_function, division
 
 import torch
@@ -42,17 +36,30 @@ cudnn.benchmark = True
 plt.ion()   # interactive mode
 
 
-# In[2]
+# In[1]
 # Utility Functions
 def soft(x,y):
+    ''' Softmax of x to [x,y]'''
     return 1/(1 + np.exp(y-x))
 
+
 def sig(x):
+    ''' Sigmoid Activation'''
     return 1/(1 + np.exp(-x))
 
-# Return the slide numbers used for validation
-# Same number of BM and C slides will be used for validation
+
 def shuffle(slides_BM, slides_C, nfold = 1, num_val = 20, overlap = 0):
+    ''' Given the Met+ and Met- slides, reserve a balanced set of Met+ and Met- slides for validation/testing 
+    
+    Parameters:
+    slides_BM (int array): Array of the slide numbers with class label Met+(BM)
+    slides_C  (int array): Array of the slide numbers with class label Met-(C)
+    nfold (int)          : Number of folds
+    num_val (int)        : Total number of balanced Met+ and Met- slides
+
+    Returns:
+    int array with size (nfold, num_val) : Returning the slide numbers of the reserved balanced slides for each fold
+    '''
     validation_slide_split = np.zeros((nfold, num_val))
     np.random.seed(1)
     np.random.shuffle(slides_BM)
@@ -63,11 +70,10 @@ def shuffle(slides_BM, slides_C, nfold = 1, num_val = 20, overlap = 0):
     return validation_slide_split.astype('int')
         
     
-    
 
-# In[3]
-# datatype = 'train' / 'val'
-# file = 000000_000.png
+# In[2] Customized Dataset Class
+# Returns a (transformed image, binary label, slide number) tuple for every item
+# BM(Brain Metastatic, Met+, 0) and C(Control, Met-, 1)
 class NSCLC_Dataset(Dataset):
     def __init__(self, datafolder, datatype, transform, validation_slides):
         self.datafolder = datafolder
@@ -89,7 +95,7 @@ class NSCLC_Dataset(Dataset):
                     else:
                         self.count[slide] += 1
                     self.dataset_image.append((img, label, slide))
-                elif datatype == 'val' and slide in validation_slides:
+                elif datatype == 'test' and slide in validation_slides:
                     if not slide in self.count:
                         self.count[slide] = 1
                     else:
@@ -111,33 +117,34 @@ class NSCLC_Dataset(Dataset):
                 
         image = Image.open(img_name)
         image = self.transform(image)
-        # print(image)
-        # Same for the labels files
         return image, self.dataset_image[idx][1], self.dataset_image[idx][2]
     
     
-# In[]
+# In[3] Main
 if __name__ == '__main__':
+    # Paths to where the dataset folder is stored 
+    ''' CHANGE THIS '''
+    Cpath = ''
     
     # Hyper Parameters and Paths
-    Cpath = 'D:/2021_NSCLC_Haowen/'
-    root_name = 'NSCLC_3rd_TumorOnly_mag_20_color_Yes_for_shuffle_colornorm_combined' 
-    color_norm = 'No'
-    model_abbr = 'Resenet18_'
-    magnif = '20'
-    lr = 1e-3
-    offset = 0
-    nfold = 3 # 5
+    root_name = 'NSCLC_Dataset'  # Dataset directory name
+    model_abbr = 'Resenet18_'    # Model Identifier
+    magnif = '20'                # 20x Magnification Images
+    num_epochs_list = [16,8,23] # Number of epochs to train for each train-test experiment, determined from cross-validation
     tile_per_slide = 1000
-    num_val = 40 # 20
     
-    batch_size = 256
-    test_batch_size = 1
     
-    momentum = 0.9
-    num_epochs_list = [16,8,23]
-    # num_epochs = 10
-    weight_decay = 0.1
+    # Train-test experiments
+    nfold = 3    # Number of train-test experiments
+    num_val = 40 # Number of slides reserved for testing in each train-test experiment
+    
+    # Model Training Parameters
+    batch_size = 200    # Batch size
+    num_workers = 2     # Number of workers for data loading
+    lr = 1e-3           # Learning rate
+    momentum = 0.9      # Momentum
+    weight_decay = 0.1  # Weight decay
+    
     
     data_dir = Cpath + root_name 
     indexpath = data_dir  + '/' + 'Index/'
@@ -154,15 +161,20 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok = True)
     
     
-    # Get the slide numbers for BM and C
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(device)
+    
+    
     # Combine the train and testing index files
-    
-    
     iminfo_train = pd.read_csv(os.path.join(indexpath, 'iminfo_train.csv'))
     iminfo_test = pd.read_csv(os.path.join(indexpath, 'iminfo_test.csv'))
     iminfo_list = pd.concat([iminfo_train, iminfo_test], ignore_index=True)
     iminfo_list = iminfo_list.sort_values(by = ['Slide', 'Index'])
+    del iminfo_train, iminfo_test
     
+    # Get the slide numbers for BM and C
+    # In the code, BM (Brain Metastatic) means Met+ patients
+    # C (Control) means Met- patients
     slides_BM = []
     slides_C  = []
     for idx in range(len(iminfo_list) // tile_per_slide):
@@ -175,14 +187,10 @@ if __name__ == '__main__':
     slides_BM = np.array(slides_BM)
     slides_C  = np.array(slides_C)
     
-    # In[]
-    validation_slide_splits = shuffle(slides_BM, slides_C, num_val = num_val, nfold = nfold, overlap = 0)
+    # Train Test Splits
+    validation_slide_splits = shuffle(slides_BM, slides_C, num_val = num_val, nfold = nfold, overlap = 0)    
     
-    np.save(os.path.join(indexpath,'nfold_splits_nfold_'+ str(nfold) + '_offset_' + str(offset) + '.npy'), validation_slide_splits)
-    
-    # In[]
-    for fold in range(nfold): # nfold
-    
+    for fold in range(nfold): # For each train-test experiment
         num_epochs = num_epochs_list[fold]
         iminfo_train_cv = iminfo_list.drop(np.arange(0, len(iminfo_list), 1))
         iminfo_val_cv = iminfo_list.drop(np.arange(0, len(iminfo_list), 1))
@@ -200,7 +208,8 @@ if __name__ == '__main__':
                 
         slide_num = slide_num.astype('int')
                 
-        # In[]
+        # Load the precalculated mean and variance of each RGB channel
+        # These valus will be used for standardization of model input
         mean_r = np.mean(iminfo_train_cv['mean_r'])
         mean_g = np.mean(iminfo_train_cv['mean_g'])
         mean_b = np.mean(iminfo_train_cv['mean_b'])
@@ -210,20 +219,11 @@ if __name__ == '__main__':
         
         print(mean_r,mean_g,mean_b,std_r,std_g,std_b)
         
-        # In[5]
-        # Data augmentation and normalization for training
-        # Just normalize for validation
+        # Data transform
+        # For training, random cropping, rotations and flippings are added as data augmentation
+        # For testing, only center cropping will be used
         data_transforms = {
-            'train': transforms.Compose([
-                                    transforms.Resize(256),
-                                    transforms.RandomCrop(224),
-                                    transforms.RandomHorizontalFlip(),
-                                    transforms.RandomVerticalFlip(),
-                                    transforms.RandomRotation(90),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize([mean_r,mean_g,mean_b], [std_r,std_g,std_b])
-                                    ]),
-            'val': transforms.Compose([
+            'test': transforms.Compose([
                                     transforms.Resize(256),
                                     transforms.CenterCrop(224),
                                     transforms.ToTensor(),
@@ -231,31 +231,22 @@ if __name__ == '__main__':
                                     ]),
             }
         
-        # In[] 
-        # Dataset Loader
-        image_datasets = {x: NSCLC_Dataset(data_dir + '/train/', x, data_transforms[x], validation_slide_splits[fold]) for x in ['train', 'val']}
-        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=16) for x in ['train', 'val'] }
-        dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-           
-        device = torch.device("cuda:0")
-        
-        print(device)
+        # Customized Dataset and corresponding Dataloader for current train-test experiment
+        image_datasets = {x: NSCLC_Dataset(data_dir + '/train/', x, data_transforms[x], validation_slide_splits[fold]) for x in ['test']}
+        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=16) for x in ['test'] }
+        dataset_sizes = {x: len(image_datasets[x]) for x in ['test']}
         print(dataset_sizes)
            
-        # In[6]
-        # Set model
-        save_name = root_name + '_lr_' + str(lr) + '_model_' + model_abbr + 'fold_' + str(int(fold + offset))
-        
-                   
-        model_name = 'NSCLC_3rd_TumorOnly_mag_20_color_Yes_for_shuffle_colornorm_combined_lr_0.001_model_Resenet18_fold_' + str(int(fold + offset)) + '_whole_model.pt'
+        # Load trained models
+        save_name = root_name + '_lr_' + str(lr) + '_model_' + model_abbr + 'fold_' + str(int(fold))
+        model_name = 'NSCLC_3rd_TumorOnly_mag_20_color_Yes_for_shuffle_colornorm_combined_lr_0.001_model_Resenet18_fold_' + str(int(fold)) + '_whole_model.pt'
         model_ft = torch.load(os.path.join(save_dir,model_name))
       
         model_ft = model_ft.to(device)
         
 
         
-        # In[]
-        # Get the slide-level accuracy based on the best model
+        # Get the tile-level testing accuracy
         slide_accuracies_soft = {}
         slide_accuracies_sig = {}
         model_ft.eval()
@@ -264,7 +255,7 @@ if __name__ == '__main__':
         tile_y_true = np.array([])
         tile_y_pred = np.array([])
         
-        for inputs, labels, slides in dataloaders['val']:
+        for inputs, labels, slides in dataloaders['test']:
             inputs = inputs.to(device)
             labels = labels.to(device)
 
@@ -294,11 +285,11 @@ if __name__ == '__main__':
             # statistics
             running_corrects += torch.sum(preds_class == labels.data)
          
-        overall_val_accuracy = (running_corrects / dataset_sizes['val']).cpu().numpy()
+        overall_val_accuracy = (running_corrects / dataset_sizes['test']).cpu().numpy()
         
 
         
-        # In[]
+        # Show results
         tile_auc_score = roc_auc_score(1-tile_y_true, tile_y_pred)
         fpr, tpr, thres = roc_curve(1-tile_y_true, tile_y_pred)
         plt.plot(fpr,tpr)
@@ -311,7 +302,8 @@ if __name__ == '__main__':
         
         np.save(os.path.join(save_dir, 'Tile_y_true_' + save_name + '.npy'),1 - tile_y_true)
         np.save(os.path.join(save_dir, 'Tile_y_pred_' + save_name + '.npy'),tile_y_pred)
-        # In[]
+        
+        # Get the slide-level test accuracy
         count_slide_pred_correct = 0
         slide_y_true = []
         slide_y_pred = []
@@ -346,11 +338,9 @@ if __name__ == '__main__':
         plt.title('Fold ' + str(fold) + ' Slide-Level ROC Curve')
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
-        # plt.savefig(os.path.join(save_dir, 'Fold ' + str(fold) + ' Slide-Level ROC Curve.png'))
         plt.show()
         print('Fold ' + str(fold) + ' Slide-Level AUC Score ' + str(slide_auc_score))
         
-        # In[]
                 
         nfold_val_slide_acc.append(count_slide_pred_correct / len(slide_accuracies_soft))
         nfold_val_tile_acc.append(overall_val_accuracy)
