@@ -144,6 +144,7 @@ if __name__ == '__main__':
     lr = 1e-3           # Learning rate
     momentum = 0.9      # Momentum
     weight_decay = 0.1  # Weight decay
+    num_workers = 2     # Number of workers for data loading
     
     
     data_dir = Cpath + root_name 
@@ -233,7 +234,7 @@ if __name__ == '__main__':
         
         # Customized Dataset and corresponding Dataloader for current train-test experiment
         image_datasets = {x: NSCLC_Dataset(data_dir + '/train/', x, data_transforms[x], validation_slide_splits[fold]) for x in ['test']}
-        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=16) for x in ['test'] }
+        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=num_workers) for x in ['test'] }
         dataset_sizes = {x: len(image_datasets[x]) for x in ['test']}
         print(dataset_sizes)
            
