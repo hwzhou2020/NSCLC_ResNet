@@ -69,7 +69,7 @@ def shuffle(slides_BM, slides_C, nfold = 1, num_val = 20):
     
 # In[2] Customized Dataset Class
 # Returns a (transformed image, binary label, slide number) tuple for every item
-# BM(Brain Metastatic, Met+, 0) and C(Control, Met-, 1) corresponds to Met+ and Met-, respectively
+# BM(Brain Metastatic, Met+, 0) and C(Control, Met-, 1)
 class NSCLC_Dataset(Dataset):
     def __init__(self, datafolder, datatype, transform, validation_slides, testing_slides):
         self.datafolder = datafolder
