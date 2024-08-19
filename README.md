@@ -33,6 +33,23 @@ The trained models for the three train-test splits are available at CaltechData:
 
 For loading and using the trained models, only "Testing.py" needs to be run. 
 
+## Related work
+Related work on length-scale investigation for NSCLC is at https://github.com/hwzhou2020/NSCLC_length_scale
+
 ## Citation (Bibitex)
 
-To be released.
+```
+@article{Zhou24NSCLC,
+author = {Zhou, Haowen and Watson, Mark and Bernadt, Cory T and Lin, Steven (Siyu) and Lin, Chieh-yu and Ritter, Jon H and Wein, Alexander and Mahler, Simon and Rawal, Sid and Govindan, Ramaswamy and Yang, Changhuei and Cote, Richard J},
+title = {AI-guided histopathology predicts brain metastasis in lung cancer patients},
+journal = {The Journal of Pathology},
+volume = {263},
+number = {1},
+pages = {89-98},
+keywords = {non-small cell lung cancer, deep learning, brain metastasis, digital pathology, artificial intelligence},
+doi = {https://doi.org/10.1002/path.6263},
+url = {https://pathsocjournals.onlinelibrary.wiley.com/doi/abs/10.1002/path.6263},
+eprint = {https://pathsocjournals.onlinelibrary.wiley.com/doi/pdf/10.1002/path.6263},
+year = {2024}
+}
+```
